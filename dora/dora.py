@@ -162,7 +162,7 @@ class _LazyExpr(object):
 
         for dep in self.dependencies:
             if dep.scope is None:
-                raise NameError(f"'{dep.name}' is not defined (in expression '{expr}')")
+                raise NameError(f"'{dep.key}' is not defined (in expression '{expr}')")
 
     @property
     def local_dependencies(self):
