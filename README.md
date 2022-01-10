@@ -1,3 +1,3 @@
 # snipppets
 
-Collections of code snippets. Go check 'em out ! 
+Collections of code snippets / mini projects. Go check 'em out ! 
