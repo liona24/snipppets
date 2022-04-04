@@ -1,0 +1,11 @@
+kernel/*.cmd
+kernel/Module.symvers
+kernel/modules.order
+
+kernel/simpledev.ko
+kernel/simpledev.mod
+kernel/simpledev.mod.c
+kernel/simpledev.mod.o
+kernel/simpledev.o
+
+user/userland
