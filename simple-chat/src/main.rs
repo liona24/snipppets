@@ -1,47 +1,45 @@
-use std::io::{self, Read, Write};
 use std::env;
-use std::process;
+use std::io::{self, Read, Write};
 use std::net::{TcpListener, TcpStream};
-use std::sync::{Mutex, Arc};
+use std::process;
+use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time;
 
 #[derive(Debug)]
 struct ApplicationOptions {
-    is_server : bool,
-    port : usize,
-    ip_addr : String,
+    is_server: bool,
+    port: usize,
+    ip_addr: String,
 }
 
 #[derive(Debug)]
 struct TcpClient {
-    id : usize,
-    stream : TcpStream
+    id: usize,
+    stream: TcpStream,
 }
 
-fn spawn_server_monitor(exit_requested : &Arc<Mutex<bool>>) -> thread::JoinHandle<()> {
+fn spawn_server_monitor(exit_requested: &Arc<Mutex<bool>>) -> thread::JoinHandle<()> {
     let exit_requested = Arc::clone(exit_requested);
-    thread::spawn(move || {
-        loop {
-            let mut buf = String::new();
-            if io::stdin().read_line(&mut buf).unwrap_or_default() > 0 {
-                if buf.trim() == "quit" {
-                    let mut exit_requested = exit_requested.lock().unwrap();
-                    *exit_requested = true;
-                    break;
-                }
-                else {
-                    println!("Type 'quit' to shutdown the server!");
-                }
+    thread::spawn(move || loop {
+        let mut buf = String::new();
+        if io::stdin().read_line(&mut buf).unwrap_or_default() > 0 {
+            if buf.trim() == "quit" {
+                let mut exit_requested = exit_requested.lock().unwrap();
+                *exit_requested = true;
+                break;
+            } else {
+                println!("Type 'quit' to shutdown the server!");
             }
         }
     })
 }
 
-fn run_server(ip_addr : &str, port : usize) -> io::Result<()> {
-
+fn run_server(ip_addr: &str, port: usize) -> io::Result<()> {
     let listener = TcpListener::bind(format!("{0}:{1}", ip_addr, port))?;
-    listener.set_nonblocking(true).expect("Cannot set non-blocking!");
+    listener
+        .set_nonblocking(true)
+        .expect("Cannot set non-blocking!");
     let clients = Arc::new(Mutex::new(Vec::<TcpClient>::new()));
     let mut client_handles = vec![];
 
@@ -57,13 +55,12 @@ fn run_server(ip_addr : &str, port : usize) -> io::Result<()> {
                 let clients = clients.clone();
                 let exit_requested = exit_requested.clone();
 
-                socket.set_nonblocking(true).expect("non_blocking socket failed!");
+                socket
+                    .set_nonblocking(true)
+                    .expect("non_blocking socket failed!");
 
                 let handle = thread::spawn(move || {
-                    let client = TcpClient {
-                        id,
-                        stream : socket
-                    };
+                    let client = TcpClient { id, stream: socket };
                     {
                         let mut clients_locked = clients.lock().unwrap();
                         (*clients_locked).push(client);
@@ -71,8 +68,8 @@ fn run_server(ip_addr : &str, port : usize) -> io::Result<()> {
                     handle_client(id, clients, exit_requested);
                 });
                 client_handles.push(handle);
-            },
-            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {},
+            }
+            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {}
             Err(e) => println!("Could not get client: {:?}", e),
         }
 
@@ -94,33 +91,34 @@ fn run_server(ip_addr : &str, port : usize) -> io::Result<()> {
     Ok(())
 }
 
-fn run_client(remote_ip_addr : &str, remote_port : usize) -> io::Result<()> {
-
+fn run_client(remote_ip_addr: &str, remote_port: usize) -> io::Result<()> {
     let stream = TcpStream::connect(format!("{0}:{1}", remote_ip_addr, remote_port))?;
-    stream.set_read_timeout(Some(time::Duration::from_millis(50))).expect("Could not set read timeout!");
+    stream
+        .set_read_timeout(Some(time::Duration::from_millis(50)))
+        .expect("Could not set read timeout!");
     let stream = Arc::new(Mutex::new(stream));
 
     {
         let stream = stream.clone();
-        let _handle = thread::spawn(move || {
-            loop {
-                {
-                    let mut stream = stream.lock().unwrap();
-                    let mut buf = [0u8; 100];
-                    if stream.read(&mut buf).unwrap_or(0) > 0 {
-                        println!("> {}", String::from_utf8(buf.to_vec()).unwrap_or("[ Err ] Could not decode message!".to_string()));
-                    }
+        let _handle = thread::spawn(move || loop {
+            {
+                let mut stream = stream.lock().unwrap();
+                let mut buf = [0u8; 100];
+                if stream.read(&mut buf).unwrap_or(0) > 0 {
+                    println!(
+                        "> {}",
+                        String::from_utf8(buf.to_vec())
+                            .unwrap_or("[ Err ] Could not decode message!".to_string())
+                    );
                 }
-
-                let sleep_dur = time::Duration::from_millis(200);
-                thread::sleep(sleep_dur);
             }
+
+            let sleep_dur = time::Duration::from_millis(200);
+            thread::sleep(sleep_dur);
         });
     }
 
-
     loop {
-
         let mut buf = String::new();
         io::stdin().read_line(&mut buf)?;
         buf.pop(); // pop new line character
@@ -141,7 +139,7 @@ fn run_client(remote_ip_addr : &str, remote_port : usize) -> io::Result<()> {
     Ok(())
 }
 
-fn handle_client(id : usize, clients : Arc<Mutex<Vec<TcpClient>>>, exit_requested : Arc<Mutex<bool>>) {
+fn handle_client(id: usize, clients: Arc<Mutex<Vec<TcpClient>>>, exit_requested: Arc<Mutex<bool>>) {
     loop {
         {
             if *exit_requested.lock().unwrap() {
@@ -152,27 +150,32 @@ fn handle_client(id : usize, clients : Arc<Mutex<Vec<TcpClient>>>, exit_requeste
         {
             let mut clients = clients.lock().unwrap();
             if let Some(client) = clients.iter_mut().find(|c| c.id == id) {
-                let mut buf = [ 0u8; 100 ];
+                let mut buf = [0u8; 100];
 
                 match client.stream.read(&mut buf) {
                     Ok(n) => {
                         if n < buf.len() {
                             println!("Recieved message of invalid size! [{:?}]", client);
                         } else {
-                            println!("Received message: [{}]", String::from_utf8(buf.to_vec()).unwrap_or_default());
+                            println!(
+                                "Received message: [{}]",
+                                String::from_utf8(buf.to_vec()).unwrap_or_default()
+                            );
                             for c in clients.iter_mut() {
                                 if c.id != id {
-                                    c.stream.write(&buf)
-                                        .unwrap_or_else(|_| {
-                                            println!("Could not forward message to client [{:?}]", c.stream);
-                                            0usize
-                                        });
+                                    c.stream.write(&buf).unwrap_or_else(|_| {
+                                        println!(
+                                            "Could not forward message to client [{:?}]",
+                                            c.stream
+                                        );
+                                        0usize
+                                    });
                                 }
                             }
                         }
-                    },
-                    Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {},
-                    Err(e) => panic!("Encountered io error: {}", e)
+                    }
+                    Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {}
+                    Err(e) => panic!("Encountered io error: {}", e),
                 }
             } else {
                 break;
@@ -186,42 +189,42 @@ fn handle_client(id : usize, clients : Arc<Mutex<Vec<TcpClient>>>, exit_requeste
 
 fn print_usage() {
     println!("Usage:");
-    println!("I  - Start a server instance:")
+    println!("I  - Start a server instance:");
     println!("./chat is_server=true port=9000 ip_addr=0.0.0.0");
-    println!("II - Start as many clients as you want:")
+    println!("II - Start as many clients as you want:");
     println!("./chat is_server=false port=9000 ip_addr=<ip of server>");
     println!("Messages from clients are broadcasted to all other clients");
 }
 
-fn parse_args(args : Vec<String>) -> ApplicationOptions {
+fn parse_args(args: Vec<String>) -> ApplicationOptions {
     let mut is_server = false;
     let mut port = 9000;
     let mut ip_addr = String::from("0.0.0.0");
     let mut any_parse_errors = false;
 
     for arg in args.iter().skip(1) {
-        let pair : Vec<&str> = arg.split("=").collect();
+        let pair: Vec<&str> = arg.split("=").collect();
         if pair.len() != 2 {
             println!("Error in argument '{}'!", &arg);
             any_parse_errors = true;
         } else {
             match pair[0] {
-                "is_server" => is_server = pair[1]
-                    .parse::<bool>()
-                    .unwrap_or_else(|err| {
+                "is_server" => {
+                    is_server = pair[1].parse::<bool>().unwrap_or_else(|err| {
                         println!("{}", err);
                         any_parse_errors = true;
                         is_server
-                    }),
-                "port" => port = pair[1]
-                    .parse::<usize>()
-                    .unwrap_or_else(|err| {
+                    })
+                }
+                "port" => {
+                    port = pair[1].parse::<usize>().unwrap_or_else(|err| {
                         println!("{}", err);
                         any_parse_errors = true;
                         port
-                    }),
+                    })
+                }
                 "ip_addr" => ip_addr = pair[1].to_string(),
-                &_ => println!("Unknown option '{}'!", &arg)
+                &_ => println!("Unknown option '{}'!", &arg),
             }
         }
     }
@@ -234,7 +237,7 @@ fn parse_args(args : Vec<String>) -> ApplicationOptions {
     ApplicationOptions {
         is_server,
         port,
-        ip_addr
+        ip_addr,
     }
 }
 
