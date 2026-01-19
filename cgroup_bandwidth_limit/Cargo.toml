@@ -1,0 +1,17 @@
+[package]
+name = "bandwidth-limit"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+aya = "0.12"
+clap = { version = "4.1", features = ["derive"] }
+anyhow = "1"
+env_logger = "0.10"
+libc = "0.2"
+log = "0.4"
+
+[[bin]]
+name = "bandwidth-limit"
+path = "src/main.rs"
